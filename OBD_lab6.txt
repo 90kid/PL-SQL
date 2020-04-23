@@ -1,0 +1,219 @@
+--1
+create or replace procedure FarNaCelc(far float, celc out float) is
+begin
+    celc := (far - 32) * 5 / 9;
+end;
+create or replace procedure FarNaCelc2(stopnie IN OUT float) is
+begin
+    stopnie := (stopnie - 32) * 5/9;
+end;
+
+declare
+    stopnieC float;
+    stopnieF float := 100;
+begin
+    FarNaCelc(stopnieF, stopnieC);
+    FarNaCelc2(stopnieF);
+    DBMS_OUTPUT.PUT_LINE(stopnieC);
+    DBMS_OUTPUT.PUT_LINE(stopnieF);
+end;
+--2
+create sequence ID_DO_OCEN_I_STUDENTA
+start with 50
+increment by 1
+maxvalue 1000;
+
+begin
+    savepoint abc;
+    INSERT INTO STUDENT (ID_STUDENT, IMIE, NAZWISKO, ID_ADRES, NRALBUMU, ID_GRUPA)
+    VALUES (ID_DO_OCEN_I_STUDENTA.nextval, 'Dawid', 'Koziej', 1,1234, 1);
+    INSERT INTO OCENA (ID_OCENA, ID_STUDENT, ID_ZAJECIA, OCENA, DATA)
+    VALUES (ID_DO_OCEN_I_STUDENTA.nextval, 1, 1, 2,to_date('12.03.2020', 'DD:MM:YYYY'));
+    rollback to abc;
+end;
+--3
+create or replace trigger czyWiekszaNiz05
+BEFORE UPDATE on OCENA --when?? czy zadziala z :new :old???
+for each row
+declare
+begin
+    if (:NEW.ocena - :OLD.ocena) < 0.5 then
+        DBMS_OUTPUT.PUT_LINE('Nowa ocena: ' || :NEW.ocena);
+        DBMS_OUTPUT.PUT_LINE('Stara ocena: ' || :OLD.ocena);
+        DBMS_OUTPUT.PUT_LINE('Odpowiedni komunikat');
+    end if;
+end;
+
+begin
+    savepoint abc;
+    UPDATE OCENA SET OCENA.OCENA = OCENA.OCENA - 1 where OCENA.ID_OCENA = 1;
+    rollback to abc;
+end;
+--4
+create or replace function silnia(ile integer) RETURN NUMBER is
+begin
+    if ile < 2 then
+        return 1;
+    end if;
+    return ile * silnia(ile - 1);
+end;
+
+begin
+    DBMS_OUTPUT.put_line(silnia(5));
+end;
+--5
+-- create sequence STUDENT_ID --sekwencja do zadania!!!
+-- start with 50
+-- increment by 1
+-- maxvalue 1000;
+create or replace package moj_pakiet AUTHID CURRENT_USER as
+    procedure DODAJ_STUDENTA (imie STUDENT.imie%type, nazwisko STUDENT.nazwisko%type,
+    id_adres ADRES.id_adres%type, nralbumu STUDENT.nralbumu%type, id_grupa STUDENT.id_grupa%type);
+
+    procedure ZMIEN_STUDENTA (id_studenta STUDENT.id_student%type, imieS STUDENT.imie%type, nazwiskoS STUDENT.nazwisko%type,
+    id_adresS ADRES.id_adres%type, nralbumuS STUDENT.nralbumu%type, id_grupaS STUDENT.id_grupa%type);
+
+    procedure USUN_STUDENT (id_studenta STUDENT.id_student%type);
+
+    procedure ZMIEN_ADRES(id_studenta STUDENT.id_student%type, id_adresS STUDENT.id_adres%type);
+
+    procedure TOP_NN(n integer);
+
+    --zmiana jest nie do napisania tak podana wiec bede zmienial czas ZAJEC
+    procedure ZMIANA(pprzedmiot PRZEDMIOT.nazwa%type, iimie WYKLADOWCA.imie%type, nnazwisko WYKLADOWCA.nazwisko%type, dzienTyg ZAJECIA.dzientyg%type);
+
+    procedure WYPISZ_SREDNIA(pprzedmiot PRZEDMIOT.nazwa%type);
+
+    function MINMAX(polecenie VARCHAR2, ggruppa GRUPA.id_grupa%type) RETURN float;
+end moj_pakiet;
+create or replace package body moj_pakiet as
+    procedure DODAJ_STUDENTA (imie STUDENT.imie%type, nazwisko STUDENT.nazwisko%type,
+    id_adres ADRES.id_adres%type, nralbumu STUDENT.nralbumu%type, id_grupa STUDENT.id_grupa%type) is
+    temp STUDENT.id_student%type;
+    begin
+        temp := STUDENT_ID.nextval;
+        EXECUTE IMMEDIATE 'INSERT INTO STUDENT (ID_STUDENT, IMIE, NAZWISKO, ID_ADRES, NRALBUMU, ID_GRUPA)
+        VALUES (:temp, :imie, :nazwisko, :id_adres, :nralbumu, :id_grupa)'
+        using temp, imie, nazwisko, id_adres, nralbumu, id_grupa;
+    end;
+
+    procedure ZMIEN_STUDENTA (id_studenta STUDENT.id_student%type, imieS STUDENT.imie%type, nazwiskoS STUDENT.nazwisko%type,
+    id_adresS ADRES.id_adres%type, nralbumuS STUDENT.nralbumu%type, id_grupaS STUDENT.id_grupa%type) is
+    begin
+        EXECUTE IMMEDIATE 'UPDATE STUDENT SET STUDENT.imie = :imieS, STUDENT.nazwisko = :nazwiskoS, STUDENT.id_adres =
+        :id_adresS, STUDENT.nralbumu = :nralbumuS, STUDENT.id_grupa = :id_grupaS
+        where STUDENT.id_student = :id_studenta' using imieS, nazwiskoS, id_adresS, nralbumuS, id_grupaS, id_studenta;
+    end;
+
+    procedure USUN_STUDENT (id_studenta STUDENT.id_student%type) is
+    begin
+        EXECUTE IMMEDIATE 'DELETE FROM STUDENT where STUDENT.id_student = :id_studenta' using id_studenta;
+    end;
+
+    procedure ZMIEN_ADRES(id_studenta STUDENT.id_student%type, id_adresS STUDENT.id_adres%type) is
+    begin
+        EXECUTE IMMEDIATE 'UPDATE STUDENT SET STUDENT.ID_ADRES = :id_adresS where STUDENT.id_student = :id_studenta'
+        using id_adresS, id_studenta;
+    end;
+
+    procedure TOP_NN(n integer) is
+    cursor najlepsiStudenci is
+    select STUDENT.imie, STUDENT.nazwisko, avg(OCENA.ocena) as srednia
+    from STUDENT
+        inner join OCENA on STUDENT.ID_STUDENT = OCENA.ID_STUDENT
+        inner join ZAJECIA on OCENA.ID_ZAJECIA = ZAJECIA.ID_ZAJECIA
+    group by STUDENT.imie, STUDENT.nazwisko
+    having avg(OCENA.ocena) = (
+        select max(avg(ocena.ocena))
+        from STUDENT
+            inner join OCENA on STUDENT.ID_STUDENT = OCENA.ID_STUDENT
+            inner join ZAJECIA on OCENA.ID_ZAJECIA = ZAJECIA.ID_ZAJECIA
+        group by STUDENT.imie, STUDENT.nazwisko
+        );
+    roww najlepsiStudenci%rowtype;
+    nazwa VARCHAR2(20);
+    begin
+        execute immediate 'create table top_n_stud (
+            iimie VARCHAR2(20),
+            nnazwisko VARCHAR2(30),
+            srd float)';
+        open najlepsiStudenci;
+        loop
+            EXIT when najlepsiStudenci%notfound or najlepsiStudenci%rowcount = n;
+            fetch najlepsiStudenci into roww;
+            DBMS_OUTPUT.PUT_LINE(roww.IMIE || ' ' || roww.NAZWISKO || ' ' || roww.srednia);
+            execute immediate 'insert into top_n_stud (iimie, nnazwisko, srd)
+            values (:IMIE, :NAZWISKO, :srd)' using roww.IMIE, roww.NAZWISKO , roww.srednia;
+        end loop;
+        close najlepsiStudenci;
+        EXCEPTION
+            when OTHERS then
+                open najlepsiStudenci;
+                loop
+                    EXIT when najlepsiStudenci%notfound or najlepsiStudenci%rowcount = n;
+                    fetch najlepsiStudenci into roww;
+                    DBMS_OUTPUT.PUT_LINE(roww.IMIE || ' ' || roww.NAZWISKO || ' ' || roww.srednia);
+                    execute immediate 'insert into top_n_stud (iimie, nnazwisko, srd)
+                    values (:IMIE, :NAZWISKO, :srd)' using roww.IMIE, roww.NAZWISKO , roww.srednia;
+                end loop;
+                close najlepsiStudenci;
+    end;
+
+    procedure ZMIANA(pprzedmiot PRZEDMIOT.nazwa%type, iimie WYKLADOWCA.imie%type, nnazwisko WYKLADOWCA.nazwisko%type, dzienTyg ZAJECIA.dzientyg%type) is
+    cursor doZmiany is
+    select ZAJECIA.id_zajecia
+    from ZAJECIA
+        inner join PRZEDMIOT on ZAJECIA.ID_PRZEDMIOT = PRZEDMIOT.ID_PRZEDMIOT
+        inner join WYKLADOWCA on ZAJECIA.ID_WYKLADOWCA = WYKLADOWCA.ID_WYKLADOWCA
+    where WYKLADOWCA.NAZWISKO like nnazwisko
+    and WYKLADOWCA.IMIE like iimie
+    and PRZEDMIOT.NAZWA like pprzedmiot;
+    begin
+        for i in doZmiany loop
+            EXECUTE IMMEDIATE 'UPDATE ZAJECIA SET ZAJECIA.DZIENTYG = :dzienTyg where ZAJECIA.id_zajecia = :id_zajecia'
+            using dzienTyg, i.ID_ZAJECIA;
+        end loop;
+    end;
+
+    procedure WYPISZ_SREDNIA(pprzedmiot PRZEDMIOT.nazwa%type) is
+    srednia float;
+    begin
+        select avg(OCENA.ocena) into srednia
+        from OCENA
+            inner join ZAJECIA on OCENA.ID_ZAJECIA = ZAJECIA.ID_ZAJECIA
+            inner join PRZEDMIOT on ZAJECIA.ID_PRZEDMIOT = PRZEDMIOT.ID_PRZEDMIOT
+        where pprzedmiot = PRZEDMIOT.nazwa
+        group by PRZEDMIOT.NAZWA;
+        DBMS_OUTPUT.PUT_LINE(srednia);
+    end;
+
+    function MINMAX(polecenie VARCHAR2, ggruppa GRUPA.id_grupa%type) RETURN float is
+    srednia float;
+    begin
+        if upper(polecenie) like 'MAX' then
+            EXECUTE IMMEDIATE '
+            select max(avg(OCENA.ocena))
+            from OCENA
+                inner join ZAJECIA on OCENA.ID_ZAJECIA = ZAJECIA.ID_ZAJECIA
+                inner join GRUPA on ZAJECIA.ID_GRUPA = GRUPA.ID_GRUPA
+            where
+                  GRUPA.ID_GRUPA = :ggruppa
+            group by ZAJECIA.ID_PRZEDMIOT'
+            into srednia using ggruppa;
+            return srednia;
+        elsif upper(polecenie) like 'MIN' then
+            EXECUTE IMMEDIATE '
+            select min(avg(OCENA.ocena))
+            from OCENA
+                inner join ZAJECIA on OCENA.ID_ZAJECIA = ZAJECIA.ID_ZAJECIA
+                inner join GRUPA on ZAJECIA.ID_GRUPA = GRUPA.ID_GRUPA
+            where
+                  GRUPA.ID_GRUPA = :ggruppa
+            group by ZAJECIA.ID_PRZEDMIOT'
+            into srednia using ggruppa;
+            return srednia;
+        end if;
+        DBMS_OUTPUT.PUT_LINE('mamy problem zwracam -1');
+        return -1;
+    end;
+end moj_pakiet;

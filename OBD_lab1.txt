@@ -1,0 +1,129 @@
+1.
+
+select przedmiot.nazwa, AVG(ocena.ocena) as "średnia ocen" from ocena, przedmiot, zajecia where
+przedmiot.id_przedmiot = zajecia.id_przedmiot and ocena.id_zajecia = zajecia.id_zajecia group by przedmiot.nazwa;
+
+
+select przedmiot.nazwa, AVG(ocena.ocena) as "średnia ocen"
+from ocena, przedmiot, zajecia
+where przedmiot.id_przedmiot = zajecia.id_przedmiot
+and ocena.id_zajecia = zajecia.id_zajecia
+group by przedmiot.nazwa;
+
+2.
+
+select distinct wykladowca.imie, wykladowca.nazwisko, przedmiot.nazwa, sala.kodsali, budynek.nazwa, adres.ulica 
+from wykladowca, przedmiot, sala, budynek,adres, zajecia 
+where wykladowca.id_wykladowca = zajecia.id_wykladowca
+and zajecia.id_przedmiot = przedmiot.id_przedmiot 
+and zajecia.id_sala = sala.id_sala 
+and sala.id_budynek = budynek.id_budynek 
+and budynek.id_adres = adres.id_adres;
+
+3.
+
+select distinct wykladowca.imie, wykladowca.nazwisko, AVG(ocena.ocena)
+from wykladowca, zajecia, ocena, przedmiot
+where wykladowca.id_wykladowca = zajecia.id_wykladowca
+and zajecia.id_zajecia = ocena.id_zajecia
+and przedmiot.id_przedmiot = zajecia.id_przedmiot
+group by wykladowca.imie, wykladowca.nazwisko, przedmiot.nazwa
+order by wykladowca.nazwisko;
+
+4. Ma być zero
+
+select przedmiot.nazwa, wykladowca.imie, wykladowca.nazwisko, count(student.id_student)
+from przedmiot, wykladowca, student, zajecia, ocena
+where wykladowca.id_wykladowca = zajecia.id_wykladowca
+and zajecia.id_przedmiot = przedmiot.id_przedmiot
+and zajecia.id_zajecia = ocena.id_zajecia
+and ocena.id_student = student.id_student
+and ocena.ocena < 3
+group by wykladowca.imie, przedmiot.nazwa, wykladowca.nazwisko
+order by count(student.id_student);
+
+5.
+
+select wykladowca.imie, wykladowca.nazwisko, count(przedmiot.nazwa)
+from wykladowca, przedmiot, zajecia
+where zajecia.id_przedmiot = przedmiot.id_przedmiot
+and wykladowca.id_wykladowca = zajecia.id_wykladowca
+group by wykladowca.imie, wykladowca.nazwisko
+order by count(przedmiot.nazwa) desc fetch first row only;
+
+6.
+"""
+Prawidłowe polecenie podane przez babke: wyświetl grupę, kierunek studiów oraz ilość studentów w tej grp
+"""
+
+select grupa.nazwa, kierunek.nazwa, count(student.id_student)
+from grupa, kierunek, student
+where grupa.id_grupa = student.id_grupa
+and grupa.id_kierunek = kierunek.id_kierunek
+group by grupa.nazwa, kierunek.nazwa
+order by kierunek.nazwa;
+
+7.
+
+select
+    next_day(max(O.DATA), 1),
+    O.OCENA
+from
+    Ocena O inner join ZAJECIA Z on O.ID_ZAJECIA = Z.ID_ZAJECIA
+            inner join PRZEDMIOT P on Z.ID_PRZEDMIOT = P.ID_PRZEDMIOT
+            inner join STUDENT S on O.ID_STUDENT = S.ID_STUDENT
+group by
+    NAZWA, NAZWISKO, O.OCENA
+having
+    avg(O.OCENA) >= 3;
+
+
+8.
+
+select przedmiot.nazwa, count(zajecia.id_przedmiot)
+from przedmiot, zajecia
+where przedmiot.id_przedmiot = zajecia.id_przedmiot
+group by przedmiot.nazwa
+order by count(zajecia.id_przedmiot) desc;
+
+
+9.
+
+select adres.miasto, student.imie, student.nazwisko
+from adres, student
+where adres.id_adres = student.id_adres
+order by adres.miasto
+
+10.
+
+nie ma dr inż
+
+select wykladowca.imie, wykladowca.nazwisko, count(ocena.ocena)
+from wykladowca, tytulnaukowy, zajecia, ocena
+where wykladowca.id_tytul = tytulnaukowy.id_tytul
+and wykladowca.id_wykladowca = zajecia.id_wykladowca
+and zajecia.id_zajecia = ocena.id_zajecia
+and ocena.ocena = 5
+and tytulnaukowy.nazwa = 'dr in?'
+group by wykladowca.imie, wykladowca.nazwisko;
+
+
+v2 z having
+
+select wykladowca.imie, wykladowca.nazwisko, count(ocena.ocena)
+from wykladowca, tytulnaukowy, zajecia, ocena
+where wykladowca.id_tytul = tytulnaukowy.id_tytul
+and wykladowca.id_wykladowca = zajecia.id_wykladowca
+and zajecia.id_zajecia = ocena.id_zajecia
+and tytulnaukowy.nazwa = 'dr in?'
+group by wykladowca.imie, wykladowca.nazwisko, ocena.ocena
+having ocena.ocena = 5;
+
+11.
+
+select student.imie, student.nazwisko, przedmiot.nazwa
+from student, ocena, zajecia, przedmiot
+where student.id_student = ocena.id_student
+and ocena.id_zajecia = zajecia.id_zajecia
+and zajecia.id_przedmiot = przedmiot.id_przedmiot
+and ocena.ocena >= 3;

@@ -1,0 +1,316 @@
+--1--
+declare
+    cursor wykladowcaa is
+    select WYKLADOWCA.imie, WYKLADOWCA.nazwisko, count(PRZEDMIOT.id_przedmiot) as iloscprzedm
+    from WYKLADOWCA, ZAJECIA, PRZEDMIOT
+    where WYKLADOWCA.id_wykladowca = ZAJECIA.id_wykladowca
+    and ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    group by WYKLADOWCA.imie, WYKLADOWCA.nazwisko;
+begin
+    for wykladowcajedenchlop in wykladowcaa loop
+        DBMS_OUTPUT.PUT_LINE(wykladowcajedenchlop.imie || ' ' || wykladowcajedenchlop.nazwisko || ' ' || wykladowcajedenchlop.iloscprzedm);
+    end loop;
+end;
+
+--2--
+declare
+    cursor zajeciastudenta(nralbumustudenta student.nralbumu%type, nazwabudynku budynek.nazwa%type, salikod sala.kodsali%type) is
+    select count(PRZEDMIOT.id_przedmiot)  as ileprzedmiotow
+    from PRZEDMIOT, ZAJECIA, OCENA, STUDENT, SALA, BUDYNEK
+    where STUDENT.id_student = OCENA.id_student
+    and OCENA.id_zajecia = ZAJECIA.id_zajecia
+    and ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    and SALA.id_sala = ZAJECIA.id_sala
+    and SALA.id_budynek = BUDYNEK.id_budynek
+    and nralbumustudenta = STUDENT.nralbumu
+    and nazwabudynku = BUDYNEK.nazwa
+    and salikod = SALA.kodsali
+    group by STUDENT.nralbumu;
+    numeralbumustudenciaka STUDENT.nralbumu%type := &zmienna;
+    nazwabudynkustudenciaka BUDYNEK.nazwa%type := &nazwa;
+    kodsalistudenciaka SALA.kodsali%type := &kodsali;
+begin
+    for studenciak in zajeciastudenta (numeralbumustudenciaka, nazwabudynkustudenciaka, kodsalistudenciaka) loop
+        DBMS_OUTPUT.PUT_LINE(studenciak.ileprzedmiotow);
+        end loop;
+end;
+
+
+--wypisywanie przykladowych rzeczy
+declare
+    cursor zajeciastudenta is
+    select STUDENT.nralbumu, BUDYNEK.nazwa, SALA.kodsali, count(PRZEDMIOT.id_przedmiot) as ileprzedmiotow
+    from PRZEDMIOT, ZAJECIA, OCENA, STUDENT, SALA, BUDYNEK
+    where STUDENT.id_student = OCENA.id_student
+    and OCENA.id_zajecia = ZAJECIA.id_zajecia
+    and ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    and SALA.id_sala = ZAJECIA.id_sala
+    and SALA.id_budynek = BUDYNEK.id_budynek
+    group by STUDENT.nralbumu, BUDYNEK.nazwa, SALA.kodsali;
+    i INTEGER := 0;
+begin
+    for studentt in zajeciastudenta loop
+        DBMS_OUTPUT.PUT_LINE(studentt.nralbumu || ' ' || studentt.nazwa || ' ' || studentt.kodsali || ' ' || studentt.ileprzedmiotow);
+        i := 1 + i;
+        end loop;
+    DBMS_OUTPUT.PUT_LINE(i);
+end;
+
+--3--
+declare
+    cursor danestudentow is
+    select INITCAP(STUDENT.imie) as imie, UPPER(STUDENT.nazwisko) as nazwisko, STUDENT.nralbumu
+    from STUDENT order by STUDENT.nazwisko DESC;
+    maximie integer;
+    maxnazwisko integer;
+    ilekropek integer;
+begin
+    select max(LENGTH(student.imie)) into maximie from student;
+    select max(LENGTH(student.nazwisko)) into maxnazwisko from student;
+    for student in danestudentow loop
+        DBMS_OUTPUT.PUT(student.imie);
+        ilekropek := maximie - LENGTH(student.imie);
+        for i in -2..ilekropek loop
+            DBMS_OUTPUT.PUT('.');
+            end loop;
+
+        DBMS_OUTPUT.PUT(student.nazwisko);
+        ilekropek := maxnazwisko - LENGTH(student.nazwisko);
+        for i in -2..ilekropek loop
+            DBMS_OUTPUT.PUT('.');
+            end loop;
+        DBMS_OUTPUT.PUT_LINE(student.nralbumu);
+        end loop;
+end;
+--4--
+declare
+    type studencik is record
+    (
+        imie VARCHAR2(20),
+        nazwisko VARCHAR2(30),
+        nralbumu NUMBER(10)
+        );
+    student1 studencik;
+    cursor studenci is
+    select STUDENT.imie, STUDENT.nazwisko, STUDENT.nralbumu
+    from STUDENT;
+begin
+    open studenci;
+    loop
+        fetch studenci into student1;
+        exit when studenci%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(student1.imie ||' '|| student1.nazwisko ||' '|| student1.nralbumu);
+    end loop;
+    close studenci;
+end;
+
+
+declare
+    cursor studenci is
+        select STUDENT.imie, STUDENT.nazwisko, STUDENT.nralbumu
+        from STUDENT;
+    student1 studenci%rowtype;
+begin
+    open studenci;
+    loop
+        fetch studenci into student1;
+        exit when studenci%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE(student1.imie ||' '|| student1.nazwisko ||' '|| student1.nralbumu);
+    end loop;
+    close studenci;
+end;
+
+declare
+    cursor studenci is
+        select STUDENT.imie, STUDENT.nazwisko, STUDENT.nralbumu
+        from STUDENT;
+begin
+    for i in studenci loop
+        DBMS_OUTPUT.PUT_LINE(i.imie ||' '|| i.nazwisko ||' '|| i.nralbumu);
+        end loop;
+end;
+
+--5--
+declare
+    cursor najgorszyuczen(nazwaprzedmiotu przedmiot.nazwa%type) is
+    select distinct STUDENT.id_student
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where nazwaprzedmiotu = PRZEDMIOT.nazwa
+    group by STUDENT.id_student, PRZEDMIOT.nazwa
+    having avg(OCENA.ocena) =
+        (select min(avg(ocena.ocena))
+        from OCENA
+            inner join STUDENT on OCENA.id_student = STUDENT.id_student
+            inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+            inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+        where
+            PRZEDMIOT.nazwa = nazwaprzedmiotu
+        group by STUDENT.id_student, PRZEDMIOT.nazwa);
+
+    cursor zmiennieukowioceny(idnieuka STUDENT.id_student%type, nazwaprzedmiotu przedmiot.nazwa%type) is
+    select STUDENT.id_student, OCENA.id_ocena, OCENA.ocena
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join  PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where nazwaprzedmiotu LIKE PRZEDMIOT.nazwa
+    and STUDENT.id_student = idnieuka
+    for update;
+
+    jakiprzedmiot PRZEDMIOT.nazwa%type := 'Wychowanie Fizyczne';
+    nieocena EXCEPTION;
+    ilosczmian INTEGER := 0;
+begin
+    for i in najgorszyuczen(jakiprzedmiot) loop
+        DBMS_OUTPUT.PUT_LINE(i.id_student);
+        for polepszocene in zmiennieukowioceny(i.id_student, jakiprzedmiot) loop
+            if polepszocene.ocena + 0.5 > 5 then
+                raise nieocena;
+            else
+                update OCENA SET OCENA.ocena = OCENA.ocena + 0.5 where OCENA.id_ocena = polepszocene.id_ocena;
+                ilosczmian := ilosczmian + 1;
+            end if;
+            end loop;
+        end loop;
+    DBMS_OUTPUT.PUT_LINE('Ile:' ||' '|| ilosczmian || ' w ' || jakiprzedmiot);
+    exception
+        when nieocena then
+            DBMS_OUTPUT.PUT_LINE('Ile:' ||' '|| ilosczmian || ' w ' || jakiprzedmiot ||' '|| ' jednak wystapil problem :<');
+        when OTHERS then
+            DBMS_OUTPUT.PUT_LINE('wystapil inny problem');
+end;
+
+--6--
+
+declare
+    cursor typzajeci(idgrupa GRUPA.id_grupa%type) is
+    select GRUPA.id_grupa, ZAJECIA.id_zajecia, CHARAKTER.id_charakter
+    from GRUPA
+        inner join ZAJECIA on GRUPA.id_grupa = ZAJECIA.id_grupa
+        inner join CHARAKTER on ZAJECIA.id_charakter  = CHARAKTER.id_charakter
+    where
+    idgrupa = grupa.id_grupa;
+    cursor wypisz is
+    select CHARAKTER.id_charakter, count(ZAJECIA.id_charakter) as ile
+    from CHARAKTER
+        inner join ZAJECIA on CHARAKTER.id_charakter = ZAJECIA.id_charakter
+    group by CHARAKTER.id_charakter
+    order by CHARAKTER.id_charakter;
+begin
+    for i in typzajeci(1) loop
+        if i.id_charakter = 1 then
+            UPDATE ZAJECIA SET ZAJECIA.id_charakter = 3
+            where ZAJECIA.id_zajecia = i.id_zajecia;
+        elsif i.id_charakter = 3 then
+            UPDATE ZAJECIA SET ZAJECIA.id_charakter = 2
+            where ZAJECIA.id_zajecia = i.id_zajecia;
+        end if;
+    end loop;
+    for i in wypisz loop
+        DBMS_OUTPUT.PUT_LINE(i.id_charakter || ' ' || i.ile);
+        end loop;
+end;
+
+--7--
+declare
+    cursor niezaliczeni is
+    select STUDENT.id_student, PRZEDMIOT.nazwa, WYKLADOWCA.imie, WYKLADOWCA.NAZWISKO
+    from STUDENT
+        inner join OCENA on OCENA.id_student = STUDENT.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+        inner join WYKLADOWCA on ZAJECIA.id_wykladowca = WYKLADOWCA.ID_WYKLADOWCA
+    group by STUDENT.id_student, PRZEDMIOT.nazwa, WYKLADOWCA.imie, WYKLADOWCA.NAZWISKO
+    having avg(OCENA.ocena) <= 3;
+begin
+    for i in niezaliczeni loop
+        EXIT WHEN niezaliczeni%rowcount = 4;
+        DBMS_OUTPUT.PUT_LINE(i.id_student || ' ' || i.IMIE  || ' ' || i.NAZWISKO || ' ' || i.nazwa);
+    end loop;
+end;
+--8--
+
+
+--a--
+declare
+    cursor podnoszenie(nazwaprzedmiotu PRZEDMIOT.nazwa%type) is
+    select STUDENT.id_student, PRZEDMIOT.nazwa, OCENA.id_ocena, OCENA.ocena, STUDENT.imie, STUDENT.nazwisko
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where nazwaprzedmiotu = PRZEDMIOT.nazwa for update;
+    jakisprzedmiot PRZEDMIOT.nazwa%type := 'Wychowanie Fizyczne';
+
+    cursor pozostaleoceny(idstudenta STUDENT.id_student%type, przedmiotnazwa PRZEDMIOT.nazwa%type) is
+    select  STUDENT.id_student, PRZEDMIOT.nazwa, OCENA.id_ocena, OCENA.ocena, STUDENT.imie, STUDENT.nazwisko
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where idstudenta = OCENA.id_student 
+    and przedmiotnazwa not like PRZEDMIOT.nazwa
+    for update;
+begin
+    for i in podnoszenie(jakisprzedmiot) loop
+        if i.ocena <= 4 then
+            update OCENA SET OCENA.ocena = OCENA.ocena + 1
+            where current of podnoszenie;
+            DBMS_OUTPUT.PUT_LINE(i.imie ||' '|| i.nazwisko ||' '|| i.ocena);
+            for p in pozostaleoceny(i.id_student, jakisprzedmiot) loop
+                if p.ocena <= 4.5 then
+                        update OCENA set OCENA.ocena = OCENA.ocena + 0.5 where current of pozostaleoceny;
+                        --czy pod p sa nowe wartosci??????
+                        DBMS_OUTPUT.PUT_LINE(p.imie ||' '|| p.nazwisko ||' '|| p.ocena);
+                end if;
+            end loop;
+        end if;
+    end loop;
+end;
+
+--b--
+declare
+    cursor podnoszenie(nazwaprzedmiotu PRZEDMIOT.nazwa%type) is
+    select STUDENT.id_student, PRZEDMIOT.nazwa, OCENA.id_ocena, OCENA.ocena, STUDENT.imie, STUDENT.nazwisko
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where nazwaprzedmiotu = PRZEDMIOT.nazwa for update;
+    jakisprzedmiot PRZEDMIOT.nazwa%type := 'Wychowanie Fizyczne';
+
+    cursor pozostaleoceny(idstudenta STUDENT.id_student%type, przedmiotnazwa PRZEDMIOT.nazwa%type) is
+    select  STUDENT.id_student, PRZEDMIOT.nazwa, OCENA.id_ocena, OCENA.ocena, STUDENT.imie, STUDENT.nazwisko
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where idstudenta = OCENA.id_student 
+    and przedmiotnazwa not like PRZEDMIOT.nazwa
+    for update;
+
+    iimie STUDENT.imie%type;
+    nnazwisko STUDENT.nazwisko%type;
+    oocena OCENA.ocena%type;
+begin
+    for i in podnoszenie(jakisprzedmiot) loop
+        if i.ocena <= 4 then
+            update OCENA SET OCENA.ocena = OCENA.ocena + 1
+            where OCENA.id_ocena = i.id_ocena
+            returning i.imie, i.nazwisko, i.ocena into iimie, nnazwisko, oocena;
+            DBMS_OUTPUT.PUT_LINE(iimie ||' '|| nnazwisko ||' '|| oocena);
+            for p in pozostaleoceny(i.id_student, jakisprzedmiot) loop
+                if p.ocena <= 4.5 then
+                        update OCENA set OCENA.ocena = OCENA.ocena + 0.5
+                        where OCENA.id_ocena = i.id_ocena
+                        returning p.imie, p.nazwisko, p.ocena into iimie, nnazwisko, oocena;
+                        --czy pod p sa nowe wartosci??????
+                        DBMS_OUTPUT.PUT_LINE(iimie ||' '|| nnazwisko ||' '|| oocena);
+                end if;
+            end loop;
+        end if;
+    end loop;
+end;

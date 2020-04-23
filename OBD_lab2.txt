@@ -1,0 +1,131 @@
+SET SERVEROUTPUT on;
+--1--
+DECLARE
+    imie VARCHAR2(25) := &podanei;
+    nazwisko VARCHAR2(30) := &podanen;
+
+BEGIN
+
+    dbms_output.put_line('Imie: '|| imie || ' Nazwisko: ' || nazwisko);
+
+END;
+
+--2--
+DECLARE
+    n INT(5) := &podanen;
+    i INT(5) := 1;
+
+BEGIN
+
+    WHILE n > 1 LOOP
+        i := i*n;
+        n := n-1;
+    END LOOP;
+
+    dbms_output.put_line('Wynik silni ' || i);
+
+END;
+
+--3--
+DECLARE
+    r FLOAT := &podaner;
+    pi CONSTANT FLOAT := 3.1416;
+
+
+BEGIN
+
+    dbms_output.put_line('pole: ' || pi*r*r || ' obwod: ' || 2*pi*r);
+
+END;
+
+--4--
+DECLARE
+    n INT(5) := &podanen;
+    p INT(5) := &podanep;
+    wynik FLOAT := n;
+    zlen EXCEPTION;
+    zlep EXCEPTION;
+BEGIN
+    IF n < 1 OR n > 10 THEN
+        RAISE zlen;
+    ELSIF p < 1 OR p > 10 THEN
+        RAISE zlep;
+    END IF;
+
+    WHILE p > 1 LOOP
+        wynik := wynik*n;
+        p := p-1;
+    END LOOP;
+    dbms_output.put_line('wynik: ' || wynik);
+
+EXCEPTION
+    WHEN zlen THEN
+        dbms_output.put_line('zle n');
+    WHEN zlep THEN
+        dbms_output.put_line('zle p');
+END;
+
+
+--5--
+DECLARE
+    n INTEGER (5) := &podajN;
+BEGIN
+    dbms_output.put_line(POWER((1 + 1/n), n));
+END;
+
+--bez roz w szer Taylora
+DECLARE
+    n FLOAT := &podajN;
+    silnia FLOAT := 1;
+    wynikSilnia FLOAT := 1;
+    wynik FLOAT := 1;
+BEGIN
+    WHILE n >= 1 LOOP
+        WHILE silnia <= n LOOP
+            wynikSilnia := wynikSilnia * silnia;
+            silnia := silnia + 1;
+            end loop;
+        wynik := wynik + 1/wynikSilnia;
+        silnia := 1;
+        wynikSilnia := 1;
+        n := n - 1;
+        end loop;
+    DBMS_OUTPUT.PUT_LINE(wynik);
+END;
+
+
+--6--
+DECLARE
+    iloscSec NUMBER(2);
+BEGIN
+    LOOP
+        iloscSec := TO_NUMBER(TO_CHAR(SYSTIMESTAMP, 'SS'));
+        IF MOD(iloscSec, 15) = 0 THEN
+            dbms_output.put_line('jest godzina: ' || TO_CHAR(SYSTIMESTAMP, 'HH:MM:SS') || ' koncze dzialanie');
+            EXIT;
+        end if;
+--            dbms_lock.sleep(1); nie dziala bo dbms_lock jest zablokowany/nie ma go :<
+    end loop;
+END;
+
+--7--
+DECLARE
+    -- daty pisac w postaci '01' pierwszy itp
+    dzien VARCHAR(2) := &dzien;
+    miesiac VARCHAR(2) := &miesiac;
+    rok VARCHAR(5) := &rok;
+
+    -- mozna robic to w sposób:
+    --rok, miesiac, dzien number
+    --sprawdzamy czy nic nie jest ujemne
+    -- jesli miesiac lub dzien jest w przedziale [1,9] wykonujemy:
+    -- CONCAT('0',TO_CHAR(dzien))
+    --następnie wszystko łączymy w jednego stringa i TO_DATE
+
+    data VARCHAR(20) := CONCAT(CONCAT(rok,miesiac),dzien);
+BEGIN
+    DBMS_OUTPUT.PUT_LINE(trunc(sysdate) - TO_DATE(data, 'yyyymmdd'));
+EXCEPTION
+    WHEN OTHERS THEN -- jak sprawdzic jaki exception jest wywalany podczas blednej daty?
+        DBMS_OUTPUT.PUT_LINE('niepoprawna data :<');
+end;

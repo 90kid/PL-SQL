@@ -1,0 +1,258 @@
+--1--
+create or replace procedure najlepszyStudent(nnazwisko OUT STUDENT.nazwisko%type, iimie OUT STUDENT.imie%type,
+   nnralbumu OUT STUDENT.nralbumu%type, srednia OUT NUMBER) is
+    begin
+        select STUDENT.imie, STUDENT.nazwisko, STUDENT.nralbumu, avg(OCENA.ocena) into
+            iimie, nnazwisko, nnralbumu, srednia from STUDENT
+                inner join OCENA on STUDENT.id_student = OCENA.id_student
+        group by STUDENT.imie, STUDENT.nazwisko, STUDENT.nralbumu
+        having avg(OCENA.ocena) = (select max(avg(OCENA.ocena)) from OCENA group by OCENA.id_student);
+        EXCEPTION
+         when others then
+             DBMS_OUTPUT.PUT_LINE('Wiecej niz jeden student');
+    end;
+
+declare
+    imieS STUDENT.imie%type;
+    nazwiskoS STUDENT.nazwisko%type;
+    nralbumuS STUDENT.nralbumu%type;
+    sredniaS NUMBER;
+begin
+    najlepszyStudent(nazwiskoS,imieS,nralbumuS,sredniaS);
+    DBMS_OUTPUT.PUT_LINE(nazwiskoS || ' ' || imieS || ' ' || nralbumuS || ' ' || sredniaS);
+end;
+--2--
+create or replace function ileWykladowcaMaPrzedmiotow (iimie WYKLADOWCA.IMIE%type, nnazwisko WYKLADOWCA.nazwisko%type) return INTEGER is
+    ilePrzedmiotow integer(5);
+    begin
+        select count(PRZEDMIOT.id_przedmiot) into ilePrzedmiotow from PRZEDMIOT
+            inner join ZAJECIA on PRZEDMIOT.id_przedmiot = ZAJECIA.id_przedmiot
+            inner join WYKLADOWCA on ZAJECIA.id_wykladowca = WYKLADOWCA.ID_WYKLADOWCA
+        where WYKLADOWCA.IMIE like iimie
+        and WYKLADOWCA.NAZWISKO like nnazwisko
+        group by WYKLADOWCA.IMIE, WYKLADOWCA.NAZWISKO;
+        return ilePrzedmiotow;
+    end;
+
+declare
+    imieW WYKLADOWCA.imie%type := 'Piotr';
+    nazwiskoW WYKLADOWCA.nazwisko%type := 'Breit'; --4
+    ilePrzedmiotow INTEGER(5);
+    --sprawdzenie
+    cursor a is select imie, nazwisko, count(PRZEDMIOT.id_przedmiot) as c
+    from WYKLADOWCA
+        inner join ZAJECIA on WYKLADOWCA.ID_WYKLADOWCA = ZAJECIA.ID_WYKLADOWCA
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    group by imie, nazwisko order by NAZWISKO;
+begin
+--     for i in a loop --sprawdzenie
+--         DBMS_OUTPUT.PUT_LINE(i.IMIE || ' ' || i.NAZWISKO || ' ' || i.c);
+--     end loop;
+    ilePrzedmiotow := ileWykladowcaMaPrzedmiotow(imieW, nazwiskoW);
+    DBMS_OUTPUT.PUT_LINE(ilePrzedmiotow);
+end;
+--3
+create or replace function ilePrzedmiotowChodzi(nnralbumu STUDENT.nralbumu%type,
+bbudynek BUDYNEK.nazwa%type, ssala SALA.kodsali%type)
+return INTEGER
+is
+    ilePrzedmiotow INTEGER(5);
+begin
+    select count(PRZEDMIOT.id_przedmiot) into ilePrzedmiotow
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join SALA on ZAJECIA.id_sala = SALA.id_sala
+        inner join BUDYNEK on SALA.id_budynek = BUDYNEK.id_budynek
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where
+        STUDENT.nralbumu = nnralbumu
+        and bbudynek = BUDYNEK.nazwa
+        and ssala = SALA.kodsali
+    group by BUDYNEK.nazwa, SALA.kodsali, STUDENT.nralbumu;
+    return ilePrzedmiotow;
+end;
+
+declare
+    cursor a(nnralbumu STUDENT.nralbumu%type, bbudynek BUDYNEK.nazwa%type, ssala SALA.kodsali%type) is
+    select BUDYNEK.nazwa, SALA.kodsali, count(PRZEDMIOT.id_przedmiot) as ile, STUDENT.nralbumu
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.id_student
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.id_zajecia
+        inner join SALA on ZAJECIA.id_sala = SALA.id_sala
+        inner join BUDYNEK on SALA.id_budynek = BUDYNEK.id_budynek
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+    where
+        STUDENT.nralbumu = nnralbumu
+        and bbudynek = BUDYNEK.nazwa
+        and ssala = SALA.kodsali
+    group by BUDYNEK.nazwa, SALA.kodsali, STUDENT.nralbumu;
+
+    i a%rowtype;
+begin
+    open a(89875, 'Centrum Sportu i Rekreacji PK', 'Siłownia');
+    fetch a into i;
+    DBMS_OUTPUT.PUT_LINE(i.nazwa || ' ' || i.kodsali || ' ' || i.nralbumu || ' ' || i.ile);
+    close a;
+    DBMS_OUTPUT.PUT_LINE(ilePrzedmiotowChodzi(89875, 'Centrum Sportu i Rekreacji PK', 'Siłownia'));
+end;
+--4
+create or replace procedure zmianaTypu(nnazwa GRUPA.nazwa%type) is
+    cursor doZmiany is
+    select ZAJECIA.id_zajecia, ZAJECIA.id_charakter
+    from GRUPA
+        inner join ZAJECIA on GRUPA.id_grupa = ZAJECIA.id_grupa
+    where
+        GRUPA.nazwa = nnazwa for update;
+begin
+    for i in doZmiany loop
+        if i.id_charakter = 1 then --lab -> wyk | 1 -> 3
+            UPDATE ZAJECIA SET ZAJECIA.id_charakter = 3 where ZAJECIA.id_zajecia = i.id_zajecia; --current of doZmiany
+        elsif i.id_charakter = 3 then -- wyk -> cw | 3 -> 2
+            UPDATE ZAJECIA SET ZAJECIA.id_charakter = 2 where ZAJECIA.id_zajecia = i.id_zajecia; --current of doZmiany
+        end if;
+    end loop;
+end;
+declare
+    cursor a (nnazwa GRUPA.nazwa%type)is -- GRUPA 11
+    select GRUPA.nazwa as nazwaG, CHARAKTER.nazwa as nazwaC, count(ZAJECIA.id_charakter) as ile
+    from GRUPA
+        inner join ZAJECIA on ZAJECIA.id_grupa = GRUPA.id_grupa
+        inner join CHARAKTER on ZAJECIA.id_charakter = CHARAKTER.id_charakter
+    where nnazwa = GRUPA.nazwa
+    group by GRUPA.nazwa, CHARAKTER.nazwa;
+
+    cursor show is select id_grupa, nazwa from GRUPA;
+    cursor show2 is select id_charakter as id_grupa, nazwa from CHARAKTER;
+begin
+--     for p in show2 loop
+--         DBMS_OUTPUT.PUT_LINE(p.id_grupa ||' '|| p.nazwa);
+--     end loop;
+    for i in a('GRUPA 30n1') loop
+        DBMS_OUTPUT.PUT_LINE(i.nazwaG || ' ' || i.nazwaC || ' ' || i.ile);
+    end loop;
+    savepoint abcd;
+    zmianaTypu('GRUPA 30n1');
+    DBMS_OUTPUT.PUT_LINE('----------------------------------------------------');
+    for i in a('GRUPA 30n1') loop
+        DBMS_OUTPUT.PUT_LINE(i.nazwaG || ' ' || i.nazwaC || ' ' || i.ile);
+    end loop;
+    rollback to abcd;
+end;
+--5
+create or replace procedure prowadzoneZajecia(bbudynek BUDYNEK.nazwa%type, ssala SALA.kodsali%type) is
+    cursor wypiszZajecia is
+    select ZAJECIA.id_zajecia, TYTULNAUKOWY.nazwa as nazwaTN, WYKLADOWCA.IMIE as imieW, WYKLADOWCA.NAZWISKO as nazwiskoW,
+           PRZEDMIOT.nazwa as nazwaP, CHARAKTER.nazwa as nazwaC, GRUPA.id_grupa as nazwaG
+    from GRUPA
+        inner join ZAJECIA on GRUPA.id_grupa = ZAJECIA.id_grupa
+        inner join CHARAKTER on ZAJECIA.id_charakter = CHARAKTER.id_charakter
+        inner join PRZEDMIOT on ZAJECIA.id_przedmiot = PRZEDMIOT.id_przedmiot
+        inner join WYKLADOWCA on ZAJECIA.id_wykladowca = WYKLADOWCA.ID_WYKLADOWCA
+        inner join TYTULNAUKOWY on WYKLADOWCA.ID_TYTUL = TYTULNAUKOWY.ID_TYTUL
+        inner join SALA on ZAJECIA.ID_SALA = SALA.ID_SALA
+        inner join BUDYNEK on SALA.ID_BUDYNEK = BUDYNEK.ID_BUDYNEK
+    where
+        BUDYNEK.nazwa like bbudynek
+        and SALA.kodsali like ssala;
+    begin
+        for i in wypiszZajecia loop
+            DBMS_OUTPUT.PUT_LINE(i.nazwaC || ' ' || i.nazwaG || ' ' || i.nazwiskoW || ' ' || i.imieW || ' ' || i.nazwaP || ' ' || i.nazwaTN || ' ' || i.id_zajecia);
+        end loop;
+    end;
+declare
+    nazwabudynku BUDYNEK.nazwa%type := 'Centrum Sportu i Rekreacji PK';
+    kkodsali SALA.kodsali%type := 'Siłownia';
+begin
+    prowadzoneZajecia(nazwabudynku, kkodsali);
+end;
+--6
+create or replace procedure zamianaOcen(nnazwa IN OUT PRZEDMIOT.nazwa%type, ilosczmian OUT INTEGER) is
+nowaocena OCENA.ocena%type;
+cursor ocenyDoZmiany is
+select OCENA.id_ocena, OCENA.ocena
+from OCENA
+    inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.ID_ZAJECIA
+    inner join PRZEDMIOT on ZAJECIA.ID_PRZEDMIOT = PRZEDMIOT.ID_PRZEDMIOT
+where
+    PRZEDMIOT.NAZWA like nnazwa for update;
+roww ocenyDoZmiany%rowtype;
+begin
+    ilosczmian := 0; --zerowanie zmiennej
+    open ocenyDoZmiany;
+    loop
+        fetch ocenyDoZmiany into roww;
+        exit when ocenyDoZmiany%notfound;
+        LOOP
+            UPDATE OCENA SET OCENA.OCENA = OCENA.OCENA * 1.1 where roww.ID_OCENA = OCENA.ID_OCENA returning OCENA.ocena into nowaocena;
+            ilosczmian := ilosczmian + 1;
+            exit when nowaocena >= 5;
+        end loop;
+        if nowaocena > 5 then
+            UPDATE OCENA SET OCENA.OCENA = 5 where roww.ID_OCENA = OCENA.ID_OCENA;
+        end if;
+    end loop;
+    close ocenyDoZmiany;
+end;
+
+declare
+    nazwaprzedmiotu PRZEDMIOT.nazwa%type := 'Mechanika Kwantowa';
+    ile INTEGER(5);
+    cursor u is
+    select OCENA.ocena from OCENA
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.ID_ZAJECIA
+    inner join PRZEDMIOT on ZAJECIA.ID_PRZEDMIOT = PRZEDMIOT.ID_PRZEDMIOT
+    where
+        PRZEDMIOT.NAZWA like 'Mechanika Kwantowa';
+begin
+    savepoint abc;
+    for y in u loop
+        DBMS_OUTPUT.PUT_LINE(y.OCENA);
+    end loop;
+    zamianaOcen(nazwaprzedmiotu, ile);
+    DBMS_OUTPUT.PUT_LINE(nazwaprzedmiotu || ' ' || ile);
+    for y in u loop
+        DBMS_OUTPUT.PUT_LINE(y.OCENA);
+    end loop;
+    rollback to abc;
+end;
+--7
+create sequence idhistoria
+    start with 1
+    increment by 1
+    maxvalue 1000;
+
+create table HISTORIA
+(
+    ID_HISTORIA int generated as identity constraint Historia2_pk primary key,
+    IMIE        varchar2(20),
+    NAZWISKO    varchar2(30),
+    NRALBUMU    NUMBER(10)
+);
+
+create or replace procedure kogoUczy(iimie WYKLADOWCA.imie%type, nnazwisko WYKLADOWCA.nazwisko%type, ssala SALA.kodsali%type) is
+    cursor studenci is
+    select STUDENT.imie, STUDENT.nazwisko, STUDENT.NRALBUMU
+    from STUDENT
+        inner join OCENA on STUDENT.id_student = OCENA.ID_STUDENT
+        inner join ZAJECIA on OCENA.id_zajecia = ZAJECIA.ID_ZAJECIA
+        inner join WYKLADOWCA on ZAJECIA.ID_WYKLADOWCA = WYKLADOWCA.ID_WYKLADOWCA
+        inner join SALA on ZAJECIA.ID_SALA = SALA.ID_SALA
+    where WYKLADOWCA.IMIE = iimie
+    and WYKLADOWCA.NAZWISKO = nnazwisko
+    and SALA.KODSALI = ssala
+    order by STUDENT.NAZWISKO;
+begin
+    savepoint abc;
+    for i in studenci loop
+        DBMS_OUTPUT.PUT_LINE(i.IMIE || ' ' || i.NAZWISKO || ' ' || i.NRALBUMU);
+        insert into HISTORIA (IMIE, NAZWISKO, NRALBUMU)
+        VALUES ( i.IMIE, i.NAZWISKO, i.NRALBUMU);
+    end loop;
+end;
+declare
+
+begin
+    kogoUczy('Piotr', 'Breit', 'Siłownia');
+end;
+select * from HISTORIA;
